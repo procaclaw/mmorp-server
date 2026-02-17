@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,8 +49,21 @@ type MapJSON struct {
 	Height int                    `json:"height"`
 	Spawn  domainworld.SpawnPoint `json:"spawn"`
 	Rows   []string               `json:"rows"`
-	NPCs   []domainworld.NPC      `json:"npcs"`
+	NPCs   []NPCJSON              `json:"npcs"`
 	Mobs   []MobJSON              `json:"mobs"`
+}
+
+type NPCJSON struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Role         string   `json:"role"`
+	Interactions []string `json:"interactions"`
+	Dialogue     string   `json:"dialogue"`
+	TradeItems   []string `json:"trade_items"`
+	QuestInfo    string   `json:"quest_info"`
+	GoldPrice    int      `json:"gold_price"`
+	X            float64  `json:"x"`
+	Y            float64  `json:"y"`
 }
 
 type MobJSON struct {
@@ -663,8 +677,26 @@ func loadWorldMap(path string, zoneID string) (domainworld.TileMap, []domainworl
 
 	npcs := make([]domainworld.NPC, 0, len(data.NPCs))
 	for _, npc := range data.NPCs {
-		npc.ZoneID = zoneID
-		npcs = append(npcs, npc)
+		if npc.ID == "" {
+			continue
+		}
+		interactions := make([]string, 0, len(npc.Interactions))
+		for _, interaction := range npc.Interactions {
+			interactions = append(interactions, strings.ToLower(interaction))
+		}
+		npcs = append(npcs, domainworld.NPC{
+			ID:           npc.ID,
+			Name:         npc.Name,
+			Role:         npc.Role,
+			Interactions: interactions,
+			Dialogue:     npc.Dialogue,
+			TradeItems:   npc.TradeItems,
+			QuestInfo:    npc.QuestInfo,
+			GoldPrice:    npc.GoldPrice,
+			X:            npc.X,
+			Y:            npc.Y,
+			ZoneID:       zoneID,
+		})
 	}
 
 	mobs := make([]domainworld.MobState, 0, len(data.Mobs))
@@ -715,7 +747,7 @@ func fallbackWorld(zoneID string) (domainworld.TileMap, []domainworld.NPC, []dom
 		}
 		tiles[y] = row
 	}
-	return domainworld.TileMap{Width: width, Height: height, Spawn: domainworld.SpawnPoint{X: 2.5, Y: 2.5}, Tiles: tiles}, []domainworld.NPC{{ID: "npc-merchant-1", Name: "Rurik", Role: "merchant", X: 5, Y: 5, ZoneID: zoneID}}, []domainworld.MobState{{ID: "mob-slime-1", Name: "Green Slime", X: 14, Y: 12, HP: 60, MaxHP: 60, Damage: 8, PatrolRadius: 6, ZoneID: zoneID, Alive: true}}
+	return domainworld.TileMap{Width: width, Height: height, Spawn: domainworld.SpawnPoint{X: 2.5, Y: 2.5}, Tiles: tiles}, []domainworld.NPC{{ID: "npc-merchant-1", Name: "Rurik", Role: "merchant", Interactions: []string{"talk", "trade", "heal"}, Dialogue: "Welcome, traveler! What can I offer you today?", TradeItems: []string{"Health Potion", "Iron Sword", "Leather Armor"}, GoldPrice: 50, X: 5, Y: 5, ZoneID: zoneID}}, []domainworld.MobState{{ID: "mob-slime-1", Name: "Green Slime", X: 14, Y: 12, HP: 60, MaxHP: 60, Damage: 8, PatrolRadius: 6, ZoneID: zoneID, Alive: true}}
 }
 
 func distance(ax, ay, bx, by float64) float64 {
@@ -756,8 +788,8 @@ func (s *Service) Interact(c *Client, npcID, action string) {
 		nonBlockingSendJSON(c.Send, map[string]any{"type": "error", "message": "NPC not found"})
 		return
 	}
-	actionType := domainworld.InteractionType(action)
-	if !contains(npc.Interactions, actionType) {
+	action = strings.ToLower(action)
+	if !contains(npc.Interactions, action) {
 		s.mu.RUnlock()
 		nonBlockingSendJSON(c.Send, map[string]any{"type": "error", "message": fmt.Sprintf("Action %s not available for this NPC", action)})
 		return
@@ -766,27 +798,32 @@ func (s *Service) Interact(c *Client, npcID, action string) {
 
 	result := map[string]any{}
 	healUpdated := false
-	switch actionType {
-	case domainworld.InteractionTypeTalk:
+	switch action {
+	case string(domainworld.InteractionTypeTalk):
 		result["text"] = npc.Dialogue
-	case domainworld.InteractionTypeTrade:
+	case string(domainworld.InteractionTypeTrade):
 		result["items"] = npc.TradeItems
-	case domainworld.InteractionTypeQuest:
+	case string(domainworld.InteractionTypeQuest):
 		result["info"] = npc.QuestInfo
-	case domainworld.InteractionTypeHeal:
+	case string(domainworld.InteractionTypeHeal):
+		price := npc.GoldPrice
+		if price <= 0 {
+			price = 50
+		}
 		s.mu.Lock()
 		pr, exists = s.players[c.CharacterID]
-		if !exists || pr.State.Gold < 50 {
+		if !exists || pr.State.Gold < price {
 			s.mu.Unlock()
-			nonBlockingSendJSON(c.Send, map[string]any{"type": "error", "message": "Not enough gold (need 50)"})
+			nonBlockingSendJSON(c.Send, map[string]any{"type": "error", "message": fmt.Sprintf("Not enough gold (need %d)", price)})
 			return
 		}
 		oldHP := pr.State.HP
 		pr.State.HP = pr.State.MaxHP
-		pr.State.Gold -= 50
+		pr.State.Gold -= price
 		s.mu.Unlock()
 		result["success"] = true
 		result["hp_restored"] = true
+		result["gold_spent"] = price
 		result["old_hp"] = oldHP
 		result["new_hp"] = pr.State.MaxHP
 		healUpdated = true
