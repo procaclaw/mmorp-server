@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mmorp-server
+  namespace: mmorp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mmorp-server
+  template:
+    metadata:
+      labels:
+        app: mmorp-server
+    spec:
+      containers:
+        - name: server
+          image: mmorp-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: mmorp-config
+            - secretRef:
+                name: mmorp-secret
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"

@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS characters (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    class TEXT NOT NULL,
+    zone_id TEXT NOT NULL,
+    pos_x DOUBLE PRECISION NOT NULL DEFAULT 0,
+    pos_y DOUBLE PRECISION NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id);

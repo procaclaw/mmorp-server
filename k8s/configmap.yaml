@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mmorp-config
+  namespace: mmorp
+data:
+  APP_ENV: "prod"
+  HTTP_ADDR: ":8080"
+  JWT_TTL: "24h"
+  HTTP_READ_TIMEOUT: "15s"
+  HTTP_WRITE_TIMEOUT: "15s"
+  HTTP_SHUTDOWN_TIMEOUT: "20s"
+  MIGRATION_DIR: "/app/migrations"
+  REDIS_ADDR: "redis:6379"
+  REDIS_DB: "0"
+  CHARACTER_CACHE_TTL: "30s"
+  NATS_URL: "nats://nats:4222"
+  WORLD_TICK_RATE: "20"
+  WORLD_ZONE_ID: "starter-zone"
+  MAX_REQUEST_BODY_BYTES: "1048576"
