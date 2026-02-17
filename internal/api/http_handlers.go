@@ -233,6 +233,8 @@ func (h *Handler) readPump(ctx context.Context, client *worldapp.Client) {
 			DX          float64 `json:"dx"`
 			DY          float64 `json:"dy"`
 			TargetID    string  `json:"target_id"`
+			NpcId       string  `json:"npcId"`
+			Action      string  `json:"action"`
 		}
 		if err := client.Conn.ReadJSON(&msg); err != nil {
 			return
@@ -259,6 +261,12 @@ func (h *Handler) readPump(ctx context.Context, client *worldapp.Client) {
 				continue
 			}
 			h.world.Attack(client, msg.TargetID)
+		case "interact":
+			if strings.TrimSpace(msg.NpcId) == "" || strings.TrimSpace(msg.Action) == "" {
+				h.sendError(client, "npcId and action are required")
+				continue
+			}
+			h.world.Interact(client, msg.NpcId, msg.Action)
 		default:
 			h.sendError(client, "unknown message type")
 		}

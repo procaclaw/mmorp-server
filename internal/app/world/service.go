@@ -236,6 +236,7 @@ func (s *Service) Join(c *Client, char character.Character) {
 		Class:      char.Class,
 		Level:      1,
 		Experience: 0,
+		Gold:       100,
 		ZoneID:     s.zoneID,
 	}
 
@@ -725,6 +726,83 @@ func nonBlockingSend(ch chan []byte, msg []byte) {
 	select {
 	case ch <- msg:
 	default:
+	}
+}
+
+func (s *Service) findNPC(npcID string) *domainworld.NPC {
+	for i := range s.npcs {
+		if s.npcs[i].ID == npcID {
+			return &s.npcs[i]
+		}
+	}
+	return nil
+}
+
+func contains[T comparable](slice []T, elem T) bool {
+	for _, v := range slice {
+		if v == elem {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) Interact(c *Client, npcID, action string) {
+	s.mu.RLock()
+	npc := s.findNPC(npcID)
+	pr, exists := s.players[c.CharacterID]
+	if !exists || npc == nil {
+		s.mu.RUnlock()
+		nonBlockingSendJSON(c.Send, map[string]any{"type": "error", "message": "NPC not found"})
+		return
+	}
+	actionType := domainworld.InteractionType(action)
+	if !contains(npc.Interactions, actionType) {
+		s.mu.RUnlock()
+		nonBlockingSendJSON(c.Send, map[string]any{"type": "error", "message": fmt.Sprintf("Action %s not available for this NPC", action)})
+		return
+	}
+	s.mu.RUnlock()
+
+	result := map[string]any{}
+	healUpdated := false
+	switch actionType {
+	case domainworld.InteractionTypeTalk:
+		result["text"] = npc.Dialogue
+	case domainworld.InteractionTypeTrade:
+		result["items"] = npc.TradeItems
+	case domainworld.InteractionTypeQuest:
+		result["info"] = npc.QuestInfo
+	case domainworld.InteractionTypeHeal:
+		s.mu.Lock()
+		pr, exists = s.players[c.CharacterID]
+		if !exists || pr.State.Gold < 50 {
+			s.mu.Unlock()
+			nonBlockingSendJSON(c.Send, map[string]any{"type": "error", "message": "Not enough gold (need 50)"})
+			return
+		}
+		oldHP := pr.State.HP
+		pr.State.HP = pr.State.MaxHP
+		pr.State.Gold -= 50
+		s.mu.Unlock()
+		result["success"] = true
+		result["hp_restored"] = true
+		result["old_hp"] = oldHP
+		result["new_hp"] = pr.State.MaxHP
+		healUpdated = true
+	}
+	resp := map[string]any{
+		"type":   "npc_response",
+		"npcId":  npcID,
+		"action": action,
+		"result": result,
+	}
+	nonBlockingSendJSON(c.Send, resp)
+	if healUpdated {
+		s.mu.RLock()
+		pr, _ = s.players[c.CharacterID]
+		s.mu.RUnlock()
+		nonBlockingSendJSON(c.Send, map[string]any{"type": "player_update", "player": pr.State})
 	}
 }
 

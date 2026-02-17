@@ -11,6 +11,15 @@ const (
 	TileForest TileType = "forest"
 )
 
+type InteractionType string
+
+const (
+	InteractionTypeTalk  InteractionType = "talk"
+	InteractionTypeTrade InteractionType = "trade"
+	InteractionTypeQuest InteractionType = "quest"
+	InteractionTypeHeal  InteractionType = "heal"
+)
+
 type SpawnPoint struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
@@ -33,16 +42,21 @@ type PlayerState struct {
 	Class      string    `json:"class"`
 	Level      int       `json:"level"`
 	Experience int       `json:"experience"`
+	Gold       int       `json:"gold"`
 	ZoneID     string    `json:"zone_id"`
 }
 
 type NPC struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Role   string  `json:"role"`
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	ZoneID string  `json:"zone_id"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Role        string            `json:"role"`
+	Interactions []InteractionType `json:"interactions"`
+	Dialogue    string            `json:"dialogue,omitempty"`
+	TradeItems  []string          `json:"trade_items,omitempty"`
+	QuestInfo   string            `json:"quest_info,omitempty"`
+	X           float64           `json:"x"`
+	Y           float64           `json:"y"`
+	ZoneID      string            `json:"zone_id"`
 }
 
 type MobState struct {
