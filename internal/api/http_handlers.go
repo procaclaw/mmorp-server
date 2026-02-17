@@ -87,7 +87,12 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request"})
+		if errors.Is(err, authapp.ErrInvalidEmail) || errors.Is(err, authapp.ErrWeakPassword) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		h.logger.Error().Err(err).Str("email", strings.TrimSpace(strings.ToLower(req.Email))).Msg("register failed")
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
 		return
 	}
 	writeJSON(w, http.StatusCreated, res)
@@ -103,6 +108,11 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := h.auth.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
+		if !errors.Is(err, authapp.ErrInvalidCredentials) {
+			h.logger.Error().Err(err).Str("email", strings.TrimSpace(strings.ToLower(req.Email))).Msg("login failed")
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
+			return
+		}
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid credentials"})
 		return
 	}

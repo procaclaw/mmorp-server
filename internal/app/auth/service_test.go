@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -41,5 +43,18 @@ func TestTokenIssueAndParse(t *testing.T) {
 	}
 	if parsed != uid {
 		t.Fatalf("parsed uid mismatch: got %v want %v", parsed, uid)
+	}
+}
+
+func TestRegisterValidation(t *testing.T) {
+	s := &Service{jwtSecret: []byte("secret"), jwtTTL: time.Hour}
+	_, err := s.Register(context.Background(), "not-an-email", "supersecurepass")
+	if !errors.Is(err, ErrInvalidEmail) {
+		t.Fatalf("expected ErrInvalidEmail, got %v", err)
+	}
+
+	_, err = s.Register(context.Background(), "player@example.com", "short")
+	if !errors.Is(err, ErrWeakPassword) {
+		t.Fatalf("expected ErrWeakPassword, got %v", err)
 	}
 }

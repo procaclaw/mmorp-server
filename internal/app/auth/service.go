@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrEmailInUse         = errors.New("email already in use")
+	ErrInvalidEmail       = errors.New("invalid email")
+	ErrWeakPassword       = errors.New("password must be at least 8 characters")
 )
 
 type Service struct {
@@ -38,8 +41,11 @@ func NewService(db *pgxpool.Pool, jwtSecret string, jwtTTL time.Duration) *Servi
 
 func (s *Service) Register(ctx context.Context, email, password string) (AuthResult, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
-	if email == "" || len(password) < 8 {
-		return AuthResult{}, ErrInvalidCredentials
+	if _, err := mail.ParseAddress(email); err != nil {
+		return AuthResult{}, ErrInvalidEmail
+	}
+	if len(password) < 8 {
+		return AuthResult{}, ErrWeakPassword
 	}
 	hash, err := hashPassword(password)
 	if err != nil {
