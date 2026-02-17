@@ -55,8 +55,8 @@
     "##################################################"
   ],
   "npcs": [
-    {"id": "npc-merchant-1", "name": "Rurik", "role": "merchant", "x": 5, "y": 5},
-    {"id": "npc-quest-1", "name": "Elda", "role": "quest_giver", "x": 7, "y": 6}
+    {"id": "npc-merchant-1", "name": "Rurik", "role": "merchant", "x": 5, "y": 5, "interactions": ["talk", "trade", "heal"], "dialogue": "Welcome, traveler! What can I offer you today?", "trade_items": ["Health Potion", "Iron Sword", "Leather Armor"], "gold_price": 50},
+    {"id": "npc-quest-1", "name": "Elda", "role": "quest_giver", "x": 7, "y": 6, "interactions": ["talk", "quest"], "dialogue": "The forest has become dangerous lately. Will you help us?", "quest_info": "Slime Slayer: Defeat 3 Green Slimes"}
   ],
   "mobs": [
     {"id": "mob-slime-1", "name": "Green Slime", "x": 16, "y": 16, "hp": 60, "damage": 8, "patrol_radius": 6},
