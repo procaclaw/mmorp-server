@@ -31,6 +31,9 @@ const (
 	mobAttackCooldownTicks = 7
 	mobRespawnTicks        = 50
 	mobWanderMaxTicks      = 20
+	positionUpdateTimeout  = 8 * time.Second
+	positionUpdateRetries  = 3
+	positionRetryBackoff   = 250 * time.Millisecond
 )
 
 type CharacterPositionUpdater interface {
@@ -323,10 +326,18 @@ func (s *Service) Move(c *Client, dx, dy float64) {
 	// Persist position to DB (async, don't block)
 	if s.updater != nil {
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			if err := s.updater.UpdatePosition(ctx, c.AccountID, c.CharacterID, newX, newY, zoneID); err != nil {
-				s.logger.Warn().Err(err).Str("character_id", c.CharacterID.String()).Msg("position save failed")
+			for attempt := 1; attempt <= positionUpdateRetries; attempt++ {
+				ctx, cancel := context.WithTimeout(context.Background(), positionUpdateTimeout)
+				err := s.updater.UpdatePosition(ctx, c.AccountID, c.CharacterID, newX, newY, zoneID)
+				cancel()
+				if err == nil {
+					return
+				}
+
+				s.logger.Warn().Err(err).Str("character_id", c.CharacterID.String()).Int("attempt", attempt).Msg("position save failed")
+				if attempt < positionUpdateRetries {
+					time.Sleep(positionRetryBackoff * time.Duration(attempt))
+				}
 			}
 		}()
 	}
